@@ -12,10 +12,12 @@ import org.eclipse.jetty.server.ServerConnector
 import org.eclipse.jetty.util.ssl.SslContextFactory
 
 fun createServer(): Javalin {
-    val app = Javalin.create {config ->
+    val app = Javalin.create { config ->
         config.defaultContentType = "application/json"
-        config.enableCorsForAllOrigins()
-        config.registerPlugin(OpenApiPlugin(getOpenApiOptions()));
+        config.registerPlugin(OpenApiPlugin(getOpenApiOptions()))
+        config.requestLogger { ctx, ms ->
+            Javalin.log.info("${ctx.method()} ${ctx.url()} -> ${ctx.res.status} [${ctx.res.contentType}] (took $ms ms)")
+        }
         config.server {
             val server = Server()
             val sslConnector = ServerConnector(server, sslContextFactory())
@@ -24,7 +26,6 @@ fun createServer(): Javalin {
             server
         }
     }
-
     addEndpoint(app)
     return app
 }

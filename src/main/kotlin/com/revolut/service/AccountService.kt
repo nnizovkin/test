@@ -1,17 +1,19 @@
 package com.revolut.service
 
+import com.revolut.configuration.Slf4jSqlInfoLogger
 import com.revolut.dao.Account
 import com.revolut.dao.AccountDao
 import com.revolut.dao.AccountTable
 import com.revolut.dao.execAndMap
 import io.javalin.http.BadRequestResponse
-import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
-import org.jetbrains.exposed.sql.update
 
 object AccountService {
     fun create(): Account {
         return transaction {
+            addLogger(Slf4jSqlInfoLogger)
             return@transaction AccountDao.new {
                 amount = 0
             }.toModel()
@@ -20,6 +22,7 @@ object AccountService {
 
     fun get(id: Long): Account {
         return transaction {
+            addLogger(Slf4jSqlInfoLogger)
             val account = AccountDao.findById(id) ?: throw BadRequestResponse("there is no account with such id $id")
             return@transaction account.toModel()
         }
@@ -27,12 +30,14 @@ object AccountService {
 
     fun getAll(): List<Account> {
         return transaction {
+            addLogger(Slf4jSqlInfoLogger)
             return@transaction AccountDao.all().limit(100).map { dao -> Account(dao.id.value, dao.amount) }
         }
     }
 
     fun deposit(id: Long, amount: Long): Account {
         return transaction {
+            addLogger(Slf4jSqlInfoLogger)
             val amounts = "select amount from account where id = $id for update".execAndMap { rs ->
                 rs.getLong("amount")
             }
@@ -61,9 +66,13 @@ object AccountService {
     fun transfer(from: Long, to: Long, amount: Long) {
         transaction {
             if (from < to) {
+                TransactionManager.current().exec("select amount from account where id = $from for update")
+                TransactionManager.current().exec("select amount from account where id = $to for update")
                 withdraw(from, amount)
                 deposit(to, amount)
             } else {
+                TransactionManager.current().exec("select amount from account where id = $to for update")
+                TransactionManager.current().exec("select amount from account where id = $from for update")
                 deposit(to, amount)
                 withdraw(from, amount)
             }
