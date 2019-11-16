@@ -31,7 +31,7 @@ object AccountService {
     fun getAll(): List<Account> {
         return transaction {
             addLogger(Slf4jSqlInfoLogger)
-            return@transaction AccountDao.all().limit(100).map { dao -> Account(dao.id.value, dao.amount) }
+            return@transaction AccountDao.all().limit(100).map { dao -> dao.toModel() }
         }
     }
 
